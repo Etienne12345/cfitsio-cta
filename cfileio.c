@@ -3883,6 +3883,12 @@ when writing FITS images.
         while (*ptr1 != ' ' && *ptr1 != ';' && *ptr1 != '\0') 
            ptr1++;
     }
+    else if (*ptr1 == 'c' || *ptr1 == 'C')
+    {
+        compresstype = CTA;
+        while (*ptr1 != ' ' && *ptr1 != ';' && *ptr1 != '\0') 
+            ptr1++;
+    }
 
     /* ======================== */
     /* look for tile dimensions */

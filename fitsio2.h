@@ -1146,6 +1146,8 @@ int fits_unset_compression_param( fitsfile *fptr, int *status);
 int fits_unset_compression_request( fitsfile *fptr, int *status);
 int fitsio_init_lock(void);
 
+int fits_ctadecomp(unsigned char* c, int clen, unsigned int array[], int nx);
+
 /* general driver routines */
 
 int urltype2driver(char *urltype, int *driver);

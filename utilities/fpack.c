@@ -48,7 +48,7 @@ int fp_get_param (int argc, char *argv[], fpstate *fpptr)
 	    if ((argv[iarg][0] == '-' && strlen (argv[iarg]) == 2) ||
 	        !strncmp(argv[iarg], "-q", 2) || !strncmp(argv[iarg], "-qz", 3) ||
 	        !strncmp(argv[iarg], "-g1", 3) || !strncmp(argv[iarg], "-g2", 3) ||
-	        !strncmp(argv[iarg], "-i2f", 4) ||
+	        !strncmp(argv[iarg], "-i2f", 4) || !strncmp(argv[iarg], "-cta", 4) ||
 	        !strncmp(argv[iarg], "-n3ratio", 8) || !strncmp(argv[iarg], "-n3min", 6) ||
 	        !strncmp(argv[iarg], "-tableonly", 10) || !strncmp(argv[iarg], "-table", 6) )  
 	    {
@@ -62,7 +62,15 @@ int fp_get_param (int argc, char *argv[], fpstate *fpptr)
 		    } else
 			gottype++;
 
-		} else if (argv[iarg][1] == 'p') {
+		} else if (argv[iarg][1] == 'c') {
+            fpptr->comptype = CTA;
+            if (gottype) {
+            fp_msg ("Error: multiple compression flags\n");
+            fp_usage (); exit (-1);
+            } else
+            gottype++;
+            
+        } else if (argv[iarg][1] == 'p') {
 		    fpptr->comptype = PLIO_1;
 		    if (gottype) {
 			fp_msg ("Error: multiple compression flags\n");

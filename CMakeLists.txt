@@ -237,7 +237,7 @@ SET(SRC_FILES
     putcol.c putcolb.c putcold.c putcole.c putcoli.c putcolj.c putcolk.c
     putcoll.c putcols.c putcolsb.c putcolu.c putcolui.c putcoluj.c putcoluk.c
     putkey.c quantize.c region.c ricecomp.c scalnull.c simplerng.c swapproc.c
-    wcssub.c wcsutil.c zcompress.c zuncompress.c
+    wcssub.c wcsutil.c zcompress.c zuncompress.c ctacomp.c
 )
 
 # For future modifications:

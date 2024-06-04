@@ -651,6 +651,8 @@ int fits_set_compression_pref(
 		    comptype = PLIO_1;
                 } else if (!fits_strncasecmp(value, "'HCOMPRESS_1", 12) ) {
 		    comptype = HCOMPRESS_1;
+                } else if (!fits_strncasecmp(value, "'CTA", 4) ) {
+            comptype = CTA;
                 } else if (!fits_strncasecmp(value, "'NONE", 5) ) {
 		    comptype = NOCOMPRESS;
 		} else {
@@ -6417,6 +6419,10 @@ int imcomp_decompress_tile (fitsfile *infptr,
 	}
 
     /* ************************************************************* */
+    } else if ((infptr->Fptr)->compress_type == CTA) {
+
+        *status = fits_ctadecomp(cbuf, (long) nelemll, (unsigned int*)idata, tilelen);
+
     } else {
         ffpmsg("unknown compression algorithm");
         free(idata);
@@ -8121,9 +8127,11 @@ int fits_compress_table(fitsfile *infptr, fitsfile *outfptr, int *status)
 	            default_algor = GZIP_2;
  	    } else if (!fits_strcasecmp(tempstring, "RICE_1")) {
 	            default_algor = RICE_1;
- 	    } else {
+ 	    } else if (!fits_strcasecmp(tempstring, "CTA")) {
+                default_algor = CTA;
+        } else {
  	        ffpmsg("FZALGOR specifies unsupported table compression algorithm:");
-		ffpmsg(tempstring);
+		    ffpmsg(tempstring);
 	        *status = DATA_COMPRESSION_ERR;
 	        return(*status);
 	    }
@@ -8246,7 +8254,9 @@ int fits_compress_table(fitsfile *infptr, fitsfile *outfptr, int *status)
 	            compalgor[ii] = GZIP_2;
 	    } else if (!fits_strcasecmp(tempstring, "RICE_1")) {
 	            compalgor[ii] = RICE_1;
-	    } else {
+	    } else if (!fits_strcasecmp(tempstring, "CTA")) {
+                compalgor[ii] = CTA;
+        } else {
 	        ffpmsg("Unsupported table compression algorithm specification.");
 		ffpmsg(keyname);
 		ffpmsg(tempstring);
@@ -8268,7 +8278,7 @@ int fits_compress_table(fitsfile *infptr, fitsfile *outfptr, int *status)
 			compalgor[ii] = GZIP_2;  /* gzip_2 usually works better gzip_1 */
 		}
 	} else if ( abs(coltype[ii]) == TSHORT ) {
-	        if (compalgor[ii] != GZIP_1 && compalgor[ii] != GZIP_2 && compalgor[ii] != RICE_1) {
+	        if (compalgor[ii] != GZIP_1 && compalgor[ii] != GZIP_2 && compalgor[ii] != RICE_1 && compalgor[ii] != CTA) {
 			compalgor[ii] = GZIP_2;  /* gzip_2 usually works better rice_1 */
 		 }
 	} else if (  abs(coltype[ii]) == TLONG	) {
@@ -8884,7 +8894,9 @@ int fits_uncompress_table(fitsfile *infptr, fitsfile *outfptr, int *status)
                zctype[ii] = GZIP_1;
 	   } else if (!strcmp(zvalue, "RICE_1")) {
                zctype[ii] = RICE_1;
-	   } else {
+	   } else if (!strcmp(zvalue, "CTA")) {
+               zctype[ii] = CTA;
+       } else {
 	       ffpmsg("Unrecognized ZCTYPn keyword compression code:");
 	       ffpmsg(zvalue);
 	       *status = DATA_DECOMPRESSION_ERR;
@@ -8957,7 +8969,7 @@ int fits_uncompress_table(fitsfile *infptr, fitsfile *outfptr, int *status)
 	
 	        /* read compressed bytes from input table */
 	        fits_read_descript(infptr, ii + 1, ntile, &vla_repeat, &vla_address, status);
-	
+            printf("Reading tile #%d, col #%d, start: %d, size: %d\n", ntile, ii+1, vla_address, vla_repeat);
 	        /* allocate memory and read in the compressed bytes */
 	        ptr = malloc(vla_repeat);
 	        if (!ptr) {
@@ -8973,6 +8985,14 @@ int fits_uncompress_table(fitsfile *infptr, fitsfile *outfptr, int *status)
 	
 		/* size in bytes of the uncompressed column of bytes */
 	        fullsize = (size_t) (cmajor_colstart[ii+1] - cmajor_colstart[ii]);
+
+            if (zctype[ii] == CTA) {
+
+                dlen = fits_ctadecomp((unsigned char*)ptr, vla_repeat, (unsigned int*)cptr, fullsize); 
+                // TODO SWAP the bytes to make them FITS compliant
+                // TODO handle variable-size arrays 
+                continue;
+            }
 
 	        switch (colcode[ii]) {
 
