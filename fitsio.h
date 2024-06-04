@@ -389,6 +389,7 @@ typedef struct      /* structure used to store basic FITS file information */
     LONGLONG numrows;    /* number of rows in the table (dynamically updated) */
     LONGLONG rowlength;  /* length of a table row or image size (bytes) */
     tcolumn *tableptr;   /* pointer to the table structure */
+    int ZHEAPPTR_found; /* Override THEAP value with ZHEAPPTR value, if present. Same change as proposed in https://github.com/esheldon/fitsio/issues/94, that was never merged.*/
     LONGLONG heapstart;  /* heap start byte relative to start of data unit */
     LONGLONG heapsize;   /* size of the heap, in bytes */
 

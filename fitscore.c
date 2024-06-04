@@ -4351,6 +4351,8 @@ int ffrhdu(fitsfile *fptr,    /* I - FITS file pointer */
     char name[FLEN_KEYWORD], value[FLEN_VALUE], comm[FLEN_COMMENT];
     char xname[FLEN_VALUE], *xtension, urltype[20];
 
+    (fptr->Fptr)->ZHEAPPTR_found = 0;
+
     if (*status > 0)
         return(*status);
 
@@ -4875,9 +4877,11 @@ int ffainit(fitsfile *fptr,      /* I - FITS file pointer */
         else if (*status > 0)
             return(*status);
 
-        else if (name[0] == 'T')   /* keyword starts with 'T' ? */
+        else if ((name[0] == 'T')  || /* keyword starts with 'T' ? */
+                 !FSTRNCMP(name, "ZHEAPPTR", 8)) 
             ffgtbp(fptr, name, value, status); /* test if column keyword */
 
+                 
         else if (!FSTRCMP(name, "END"))  /* is this the END keyword? */
             break;
 
@@ -5084,7 +5088,8 @@ int ffbinit(fitsfile *fptr,     /* I - FITS file pointer */
         else if (*status > 0)
             return(*status);
 
-        else if (name[0] == 'T')   /* keyword starts with 'T' ? */
+        else if ((name[0] == 'T') ||  /* keyword starts with 'T' ? */
+                 !FSTRNCMP(name, "ZHEAPPTR", 8)) 
             ffgtbp(fptr, name, value, status); /* test if column keyword */
 
         else if (!FSTRCMP(name, "ZIMAGE"))
@@ -5491,7 +5496,7 @@ int ffgtbp(fitsfile *fptr,     /* I - FITS file pointer   */
 
         colptr->twidth = width;   /* set width of a unit string in chars */
     }
-    else if (!FSTRNCMP(name + 1, "HEAP", 4) )
+    else if (!FSTRNCMP(name, "THEAP", 5) ) /* HEAP is common with the next case*/
     {
         if ((fptr->Fptr)->hdutype == ASCII_TBL)  /* ASCII table */
             return(*status);  /* ASCII tables don't have a heap */ 
@@ -5505,7 +5510,27 @@ int ffgtbp(fitsfile *fptr,     /* I - FITS file pointer   */
             /* ignore this error, so don't return error status */
             return(*status);
         }
-        (fptr->Fptr)->heapstart = jjvalue; /* starting byte of the heap */
+
+        if ((fptr->Fptr)->ZHEAPPTR_found == 0)
+            (fptr->Fptr)->heapstart = jjvalue; /* starting byte of the heap */
+        return(*status);
+    }
+    else if (!FSTRNCMP(name, "ZHEAPPTR", 8))
+    {
+        if (ffc2jj(value, &jjvalue, &tstatus) > 0) 
+        {
+            snprintf(message,FLEN_ERRMSG,
+            "Error reading value of %s as an integer: %s", name, value);
+            ffpmsg(message);
+
+            // FIXME This error should probably not be ignored... 
+            // The one above also not
+            /* ignore this error, so don't return error status */
+            return(*status);
+        }
+
+        (fptr->Fptr)->ZHEAPPTR_found = 1;
+        (fptr->Fptr)->heapstart = jjvalue; /* starting byte of the compressed HEAP */
         return(*status);
     }
 
