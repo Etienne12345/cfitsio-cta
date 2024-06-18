@@ -6422,7 +6422,7 @@ int imcomp_decompress_tile (fitsfile *infptr,
     } else if ((infptr->Fptr)->compress_type == CTA) {
 
         // FIXME deal with the version for actual images sizes and types
-        *status = fits_ctadecomp(cbuf, (long) nelemll, (unsigned short*)idata, tilelen, 0, 0);
+        *status = fits_ctadecomp(cbuf, (long) nelemll, (unsigned char*)idata, tilelen, 0, 0);
 
     } else {
         ffpmsg("unknown compression algorithm");
@@ -8995,7 +8995,7 @@ int fits_uncompress_table(fitsfile *infptr, fitsfile *outfptr, int *status)
 
             if (zctype[ii] == CTA) {
 
-                dlen = fits_ctadecomp((unsigned char*)ptr, vla_repeat, (unsigned short*)cptr, fullsize, coltype[ii], colwidth[ii]); 
+                dlen = fits_ctadecomp((unsigned char*)ptr, vla_repeat, (unsigned char*)cptr, fullsize, coltype[ii], colwidth[ii]); 
                 // TODO SWAP the bytes to make them FITS compliant
                 continue;
             }

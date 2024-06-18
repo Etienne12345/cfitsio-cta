@@ -31,6 +31,17 @@ void erase_lut(struct LUT* lut)
     free(lut);
 }
 
+
+void copy_swap(char *dest, const char *src, int num, int elem_size)
+{
+    int i;
+    const char *pend = src + num*elem_size;
+    for (const char *ptr = src; ptr<pend; ptr+=elem_size, dest+=elem_size)
+        for (i=0;i<elem_size;i++)
+            dest[i] = ptr[elem_size-i];
+}
+
+
 void add_symbol(struct LUT** lut, unsigned short sym, unsigned char nbits, size_t bits)
 {
     int i;
@@ -63,7 +74,7 @@ void add_symbol(struct LUT** lut, unsigned short sym, unsigned char nbits, size_
 
 int fits_ctadecomp(unsigned char* c, // Input buffer
                    unsigned long  input_len, //length of input in bytes
-                   unsigned short array[], // output array
+                   unsigned char array[], // output array
                    unsigned long  output_size, // size of the output array in bytes
                    int col_type, 
                    int col_width)
@@ -143,12 +154,14 @@ int fits_ctadecomp(unsigned char* c, // Input buffer
     //if we have only one input symbol, fill up the output with it
     if (sym_count == 1) {
         for (i=0;i<output_num;i++) {
-            array[i] = lut->symbol;
+            ((unsigned short*)(array))[i] = lut->symbol;
         }
         return 0;
     }
-    int j;
-    int bytes_to_go = max_input_address - c;
+   
+    //take a temporary array to reshuffle the uncompressed data
+    unsigned short* tmp_array = malloc(data_count*sizeof(unsigned short));
+
 
     //otherwise, until we exhaust the input bits
     struct LUT top_lut;
@@ -157,8 +170,7 @@ int fits_ctadecomp(unsigned char* c, // Input buffer
     struct LUT* clut = &top_lut; //lut;
     unsigned char curbit = 0;
     unsigned long num_written = 0;
-    while (num_written < output_num && 
-           c < max_input_address  && 
+    while (c < max_input_address  && 
            num_written < data_count) {
         
         //look at the current input byte. Take a two-bytes word as input to make sure that we can extract a full byte
@@ -183,7 +195,7 @@ int fits_ctadecomp(unsigned char* c, // Input buffer
         }
 
         //if we've hit a leaf, assign the symbol to the output, and consume the corresponding bits
-        array[num_written++] = clut->symbol;
+        tmp_array[num_written++] = clut->symbol;
 
         curbit    += clut->nbits;
         //and start over from the root of the graph (lut)
@@ -198,8 +210,78 @@ int fits_ctadecomp(unsigned char* c, // Input buffer
     printf("\n\n");
 
     // Un-apply the subtraction of the previous element
-    for (i=1;i<output_num;i++)
-        array[i] += array[i-1];
+    for (i=1;i<data_count;i++)
+        tmp_array[i] += tmp_array[i-1];
+
+    // Copy the temp array data to the output array
+    if (col_width == 1) {
+        if (data_count != output_num) {
+            printf("PROBLEM HERE!!! NON-ARRAY SIZE DISAGREE %d vs %d\n", data_count , output_num);
+            exit(-1);
+        }
+        memcpy(array, tmp_array, output_size);
+    }
+    else { /* Deal with arrays of possibly variable length*/
+        int src_index = 0;
+        int dst_index = 0;
+        unsigned char* char_array = (unsigned char*)(tmp_array);
+        while (src_index < (data_count*sizeof(unsigned short)-4)) { /* -4 to make sure to at least be able to read the expected next size*/ 
+            // FIXME What the #$%$## is this -4 really ? Numbers should match !!!
+            int this_row_bytes = 0;
+            memcpy(&this_row_bytes, &char_array[src_index], sizeof(this_row_bytes));
+            src_index += sizeof(this_row_bytes);
+            int bytes_factor = 1;
+            switch (col_type) {
+                case TBIT:
+                    //FIXME Figure out what to do with TBITS
+                    printf("Not sure what to do with TBITS...\n");
+                    exit(-1);
+                break;
+                case TBYTE:
+                case TSBYTE:
+                case TSTRING:
+                break;
+                case TUSHORT:
+                case TSHORT:
+                    bytes_factor = 2;
+                break;
+                case TUINT:
+                case TINT:
+                case TFLOAT:
+                    bytes_factor = 4;
+                break;
+                case TULONG:
+                case TLONG:
+                case TULONGLONG:
+                case TLONGLONG:
+                case TDOUBLE:
+                case TCOMPLEX:
+                case TDBLCOMPLEX:
+                    bytes_factor = 8;
+                break;
+                default:
+                    printf("ERROR: Got a default case in ctacomp.c. col_type was %d\n", col_type);
+                    exit(-1);
+                break;
+            };
+            printf("Copying from %d to %d size %d\n", src_index, dst_index, this_row_bytes);
+            copy_swap(&(array[dst_index]), &(char_array[src_index]), this_row_bytes / bytes_factor, bytes_factor);
+            dst_index += this_row_bytes;
+            src_index += this_row_bytes;
+            // Pad any row shorter than the expected size with zeros
+            for (i=this_row_bytes;i<col_width*bytes_factor;i++)
+                array[dst_index++] = 0;
+        }
+        printf("Reduced %d elems from tmp_array to bytes array of size %d\n", src_index, dst_index);
+        printf("Expected sizes were %d and %d\n", data_count*2, output_size);
+    }
+
+
+
+    free(tmp_array);
+
+    // swap the bytes if the ordering was big endian
+
 
     erase_lut(lut);
 

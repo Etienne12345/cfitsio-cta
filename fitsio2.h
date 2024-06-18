@@ -1146,7 +1146,7 @@ int fits_unset_compression_param( fitsfile *fptr, int *status);
 int fits_unset_compression_request( fitsfile *fptr, int *status);
 int fitsio_init_lock(void);
 
-int fits_ctadecomp(unsigned char* c, unsigned long input_len, unsigned short array[], unsigned long output_size, int col_type, int col_width);
+int fits_ctadecomp(unsigned char* c, unsigned long input_len, unsigned char array[], unsigned long output_size, int col_type, int col_width);
 
 /* general driver routines */
 
