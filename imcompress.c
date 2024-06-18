@@ -6421,7 +6421,8 @@ int imcomp_decompress_tile (fitsfile *infptr,
     /* ************************************************************* */
     } else if ((infptr->Fptr)->compress_type == CTA) {
 
-        *status = fits_ctadecomp(cbuf, (long) nelemll, (unsigned int*)idata, tilelen);
+        // FIXME deal with the version for actual images sizes and types
+        *status = fits_ctadecomp(cbuf, (long) nelemll, (unsigned short*)idata, tilelen, 0, 0);
 
     } else {
         ffpmsg("unknown compression algorithm");
@@ -8719,6 +8720,7 @@ int fits_uncompress_table(fitsfile *infptr, fitsfile *outfptr, int *status)
 { 
     char colcode[999];  /* column data type code character */
     char coltype[999];  /* column data type numeric code value */
+    int colwidth[999];
     char *cm_buffer;   /* memory buffer for the transposed, Column-Major, chunk of the table */ 
     char *rm_buffer;   /* memory buffer for the original, Row-Major, chunk of the table */ 
     LONGLONG nrows, rmajor_colwidth[999], rmajor_colstart[1000], cmajor_colstart[1000];
@@ -8859,8 +8861,13 @@ int fits_uncompress_table(fitsfile *infptr, fitsfile *outfptr, int *status)
 	while(isdigit(*cptr)) cptr++;
 	colcode[ii] = *cptr; /* save the column type code */
 
-        fits_binary_tform(tform, &inttype, &repeat, &width, status);
-        coltype[ii] = inttype;
+
+    fits_binary_tform(tform, &inttype, &repeat, &width, status);
+    coltype[ii] = inttype;
+
+    // Retrieve the width of the columns. Replace the type char with string-termination, and convert to int
+    *cptr = '\0';
+    colwidth[ii] = atoi(tform);
 
 	/* deal with special cases */
 	if (abs(coltype[ii]) == TBIT) { 
@@ -8969,7 +8976,7 @@ int fits_uncompress_table(fitsfile *infptr, fitsfile *outfptr, int *status)
 	
 	        /* read compressed bytes from input table */
 	        fits_read_descript(infptr, ii + 1, ntile, &vla_repeat, &vla_address, status);
-            printf("Reading tile #%d, col #%d, start: %d, size: %d\n", ntile, ii+1, vla_address, vla_repeat);
+            //printf("Reading tile #%d, col #%d, start: %d, size: %d\n", ntile, ii+1, vla_address, vla_repeat);
 	        /* allocate memory and read in the compressed bytes */
 	        ptr = malloc(vla_repeat);
 	        if (!ptr) {
@@ -8988,9 +8995,8 @@ int fits_uncompress_table(fitsfile *infptr, fitsfile *outfptr, int *status)
 
             if (zctype[ii] == CTA) {
 
-                dlen = fits_ctadecomp((unsigned char*)ptr, vla_repeat, (unsigned int*)cptr, fullsize); 
+                dlen = fits_ctadecomp((unsigned char*)ptr, vla_repeat, (unsigned short*)cptr, fullsize, coltype[ii], colwidth[ii]); 
                 // TODO SWAP the bytes to make them FITS compliant
-                // TODO handle variable-size arrays 
                 continue;
             }
 

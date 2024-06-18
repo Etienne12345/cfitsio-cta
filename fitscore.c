@@ -5510,7 +5510,10 @@ int ffgtbp(fitsfile *fptr,     /* I - FITS file pointer   */
             /* ignore this error, so don't return error status */
             return(*status);
         }
-
+        printf("DEALING WITH THEAP for table %x\n", fptr->Fptr);
+        printf("HEAPSIZE: %d\n", (fptr->Fptr)->heapsize);
+        printf("THEAP value: %d\n", (fptr->Fptr)->heapstart); 
+        printf("keyword THEAP: %d\n", jjvalue);
         if ((fptr->Fptr)->ZHEAPPTR_found == 0)
             (fptr->Fptr)->heapstart = jjvalue; /* starting byte of the heap */
         return(*status);
@@ -5523,14 +5526,18 @@ int ffgtbp(fitsfile *fptr,     /* I - FITS file pointer   */
             "Error reading value of %s as an integer: %s", name, value);
             ffpmsg(message);
 
-            // FIXME This error should probably not be ignored... 
-            // The one above also not
             /* ignore this error, so don't return error status */
             return(*status);
         }
-
+        printf("DEALING WITH ZHEAPPTR for table %x\n", fptr->Fptr);
+        printf("HEAPSIZE: %d\n", (fptr->Fptr)->heapsize);
+        printf("THEAP value: %d\n", (fptr->Fptr)->heapstart); //heapsize
+        printf("ZHEAPPTR value: %d\n", jjvalue);
         (fptr->Fptr)->ZHEAPPTR_found = 1;
+        if ((fptr->Fptr)->heapsize != 0)
+            (fptr->Fptr)->heapsize -= jjvalue - (fptr->Fptr)->heapstart; /* Modify the size of the heap according to the compressed data*/
         (fptr->Fptr)->heapstart = jjvalue; /* starting byte of the compressed HEAP */
+
         return(*status);
     }
 
