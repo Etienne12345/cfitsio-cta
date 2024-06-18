@@ -207,11 +207,45 @@ int fits_ctadecomp(unsigned char* c, // Input buffer
     }
 
     printf("Writing done. num written: %lu, output_num: %lu, data_count: %u\n", num_written, output_num, data_count);
-    printf("\n\n");
-
+    
     // Un-apply the subtraction of the previous element
     for (i=1;i<data_count;i++)
         tmp_array[i] += tmp_array[i-1];
+
+    int bytes_factor = 1;
+    switch (col_type) {
+        case TBIT:
+            //FIXME Figure out what to do with TBITS
+            printf("Not sure what to do with TBITS...\n");
+            exit(-1);
+        break;
+        case TBYTE:
+        case TSBYTE:
+        case TSTRING:
+        break;
+        case TUSHORT:
+        case TSHORT:
+            bytes_factor = 2;
+        break;
+        case TUINT:
+        case TINT:
+        case TFLOAT:
+            bytes_factor = 4;
+        break;
+        case TULONG:
+        case TLONG:
+        case TULONGLONG:
+        case TLONGLONG:
+        case TDOUBLE:
+        case TCOMPLEX:
+        case TDBLCOMPLEX:
+            bytes_factor = 8;
+        break;
+        default:
+            printf("ERROR: Got a default case in ctacomp.c. col_type was %d\n", col_type);
+            exit(-1);
+        break;
+    };
 
     // Copy the temp array data to the output array
     if (col_width == 1) {
@@ -219,52 +253,22 @@ int fits_ctadecomp(unsigned char* c, // Input buffer
             printf("PROBLEM HERE!!! NON-ARRAY SIZE DISAGREE %d vs %d\n", data_count , output_num);
             exit(-1);
         }
-        memcpy(array, tmp_array, output_size);
+//        memcpy(array, tmp_array, output_size);
+//FIXME copy_swap does not do the job as expected...
+        copy_swap(array, (char*)(tmp_array), output_size / bytes_factor, bytes_factor);
     }
     else { /* Deal with arrays of possibly variable length*/
         int src_index = 0;
         int dst_index = 0;
         unsigned char* char_array = (unsigned char*)(tmp_array);
-        while (src_index < (data_count*sizeof(unsigned short)-4)) { /* -4 to make sure to at least be able to read the expected next size*/ 
+        while (src_index < (data_count*sizeof(unsigned short)-2)) { /* -4 to make sure to at least be able to read the expected next size*/ 
             // FIXME What the #$%$## is this -4 really ? Numbers should match !!!
             int this_row_bytes = 0;
             memcpy(&this_row_bytes, &char_array[src_index], sizeof(this_row_bytes));
             src_index += sizeof(this_row_bytes);
-            int bytes_factor = 1;
-            switch (col_type) {
-                case TBIT:
-                    //FIXME Figure out what to do with TBITS
-                    printf("Not sure what to do with TBITS...\n");
-                    exit(-1);
-                break;
-                case TBYTE:
-                case TSBYTE:
-                case TSTRING:
-                break;
-                case TUSHORT:
-                case TSHORT:
-                    bytes_factor = 2;
-                break;
-                case TUINT:
-                case TINT:
-                case TFLOAT:
-                    bytes_factor = 4;
-                break;
-                case TULONG:
-                case TLONG:
-                case TULONGLONG:
-                case TLONGLONG:
-                case TDOUBLE:
-                case TCOMPLEX:
-                case TDBLCOMPLEX:
-                    bytes_factor = 8;
-                break;
-                default:
-                    printf("ERROR: Got a default case in ctacomp.c. col_type was %d\n", col_type);
-                    exit(-1);
-                break;
-            };
-            printf("Copying from %d to %d size %d\n", src_index, dst_index, this_row_bytes);
+            //printf("Copying from %d to %d size %d\n", src_index, dst_index, this_row_bytes);
+
+            //memcpy(&(array[dst_index]), &(char_array[src_index]), this_row_bytes);
             copy_swap(&(array[dst_index]), &(char_array[src_index]), this_row_bytes / bytes_factor, bytes_factor);
             dst_index += this_row_bytes;
             src_index += this_row_bytes;
@@ -274,14 +278,14 @@ int fits_ctadecomp(unsigned char* c, // Input buffer
         }
         printf("Reduced %d elems from tmp_array to bytes array of size %d\n", src_index, dst_index);
         printf("Expected sizes were %d and %d\n", data_count*2, output_size);
+        if (dst_index != output_size) {
+            printf("WARNING WARNING: Written (%d) and expected (%d) sizes don't match", dst_index, output_size);
+        }
     }
 
-
+    printf("\n\n");
 
     free(tmp_array);
-
-    // swap the bytes if the ordering was big endian
-
 
     erase_lut(lut);
 
