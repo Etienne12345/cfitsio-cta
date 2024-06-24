@@ -31,6 +31,79 @@ void erase_lut(struct LUT* lut)
     free(lut);
 }
 
+void apply_offset(char* array, int num, int elem_size, unsigned long long offset)
+{
+    if (offset == 0)
+        return;
+
+    int i;
+    switch (elem_size)
+    {
+        case 1: ;
+            unsigned char* uchar_array = (unsigned char*)(array);
+            for (i=0;i<num;i++)
+                uchar_array[i] -= offset;
+        break;
+        case 2: ;
+            unsigned short* short_array = (unsigned short*)(array);
+            for (i=0;i<num;i++)
+                short_array[i] -= offset;
+           
+        break;
+        case 4: ;
+            unsigned int* int_array = (unsigned int*)(array);
+            for (i=0;i<num;i++) 
+                int_array[i] -= offset;
+                
+        break;
+        case 8: ; 
+            unsigned long long* long_array = (unsigned long long*)(array);
+            long long old = long_array[0];
+            for (i=0;i<num;i++) {
+                long_array[i] -= offset;           
+            }
+            double dbl_value = (double)(long_array[0]+offset);
+            printf("Old: %lu, new %ld, old again: %lu, double: %f\n", old, long_array[0], long_array[0]+offset, dbl_value);
+        break;
+        default:
+            printf("Non supported type size: %d\n", elem_size);
+        break;
+    };
+}
+
+void pad_with_value(char* array, int num, int elem_size, unsigned long long value)
+{
+    int i;
+    switch (elem_size)
+    {
+        case 1: ;
+            unsigned char* uchar_array = (unsigned char*)(array);
+            for (i=0;i<num;i++)
+                uchar_array[i] = value;
+        break;
+        case 2: ;
+            unsigned short* short_array = (unsigned short*)(array);
+            for (i=0;i<num;i++)
+                short_array[i] = value;
+           
+        break;
+        case 4: ;
+            unsigned int* int_array = (unsigned int*)(array);
+            for (i=0;i<num;i++) 
+                int_array[i] = value;
+                
+        break;
+        case 8: ; 
+            unsigned long long* long_array = (unsigned long long*)(array);
+            for (i=0;i<num;i++)
+                long_array[i] = value;        
+        break;
+        default:
+            printf("Non supported type size: %d\n", elem_size);
+        break;
+    };
+}
+
 
 void copy_swap(char *dest, const char *src, int num, int elem_size)
 {
@@ -38,7 +111,7 @@ void copy_swap(char *dest, const char *src, int num, int elem_size)
     const char *pend = src + num*elem_size;
     for (const char *ptr = src; ptr<pend; ptr+=elem_size, dest+=elem_size)
         for (i=0;i<elem_size;i++)
-            dest[i] = ptr[elem_size-i];
+            dest[i] = ptr[elem_size-i-1];
 }
 
 
@@ -77,10 +150,9 @@ int fits_ctadecomp(unsigned char* c, // Input buffer
                    unsigned char array[], // output array
                    unsigned long  output_size, // size of the output array in bytes
                    int col_type, 
-                   int col_width)
+                   int col_width, 
+                   unsigned long long col_zero)
 {
-    
-    printf("Dealing with column type %d of width %d\n", col_type, col_width);
     unsigned long output_num = output_size / 2;
     unsigned char* max_input_address = c + input_len;
 
@@ -206,13 +278,14 @@ int fits_ctadecomp(unsigned char* c, // Input buffer
         }
     }
 
-    printf("Writing done. num written: %lu, output_num: %lu, data_count: %u\n", num_written, output_num, data_count);
+//    printf("Writing done. num written: %lu, output_num: %lu, data_count: %u\n", num_written, output_num, data_count);
     
     // Un-apply the subtraction of the previous element
     for (i=1;i<data_count;i++)
         tmp_array[i] += tmp_array[i-1];
 
     int bytes_factor = 1;
+    //unsigned long long type_offset = 0;
     switch (col_type) {
         case TBIT:
             //FIXME Figure out what to do with TBITS
@@ -224,18 +297,23 @@ int fits_ctadecomp(unsigned char* c, // Input buffer
         case TSTRING:
         break;
         case TUSHORT:
+            //type_offset = 32678;
         case TSHORT:
             bytes_factor = 2;
         break;
         case TUINT:
         case TINT:
+        case TULONG:
+        case TLONG:
+           //printf("Got TUINT Type !!!\n");
+            //type_offset = 2147483648;
         case TFLOAT:
             bytes_factor = 4;
         break;
-        case TULONG:
-        case TLONG:
         case TULONGLONG:
         case TLONGLONG:
+            //printf("Got TULONGLONG Type !!!\n");
+            //type_offset = 9223372036854775808U;
         case TDOUBLE:
         case TCOMPLEX:
         case TDBLCOMPLEX:
@@ -246,44 +324,52 @@ int fits_ctadecomp(unsigned char* c, // Input buffer
             exit(-1);
         break;
     };
-
+       printf("Zero value: %lu\n", col_zero);
     // Copy the temp array data to the output array
     if (col_width == 1) {
         if (data_count != output_num) {
             printf("PROBLEM HERE!!! NON-ARRAY SIZE DISAGREE %d vs %d\n", data_count , output_num);
             exit(-1);
         }
-//        memcpy(array, tmp_array, output_size);
-//FIXME copy_swap does not do the job as expected...
+
+        apply_offset((char*)(tmp_array), output_size / bytes_factor, bytes_factor, col_zero);
+ //      memcpy(array, tmp_array, output_size);
         copy_swap(array, (char*)(tmp_array), output_size / bytes_factor, bytes_factor);
     }
     else { /* Deal with arrays of possibly variable length*/
         int src_index = 0;
         int dst_index = 0;
         unsigned char* char_array = (unsigned char*)(tmp_array);
-        while (src_index < (data_count*sizeof(unsigned short)-2)) { /* -4 to make sure to at least be able to read the expected next size*/ 
-            // FIXME What the #$%$## is this -4 really ? Numbers should match !!!
+        //if (data_count < 2000) {
+        //    for (i=0;i<data_count;i++) {
+        //        printf("%hu ", ((unsigned short*)(char_array))[i]);
+        //    }
+        //    printf("\n");
+       // }
+        while (src_index < (data_count*sizeof(unsigned short)-2)) { /* -2 because buffer size is rounded to 4 bytes sizes when writing*/ 
+            
             int this_row_bytes = 0;
             memcpy(&this_row_bytes, &char_array[src_index], sizeof(this_row_bytes));
             src_index += sizeof(this_row_bytes);
-            //printf("Copying from %d to %d size %d\n", src_index, dst_index, this_row_bytes);
 
-            //memcpy(&(array[dst_index]), &(char_array[src_index]), this_row_bytes);
+            apply_offset( &(char_array[src_index]), this_row_bytes / bytes_factor, bytes_factor, col_zero);
+            
             copy_swap(&(array[dst_index]), &(char_array[src_index]), this_row_bytes / bytes_factor, bytes_factor);
             dst_index += this_row_bytes;
             src_index += this_row_bytes;
             // Pad any row shorter than the expected size with zeros
-            for (i=this_row_bytes;i<col_width*bytes_factor;i++)
-                array[dst_index++] = 0;
+            int missing_num = col_width - this_row_bytes/bytes_factor;
+            pad_with_value(&(array[dst_index]), missing_num, bytes_factor, -col_zero);
+            dst_index += missing_num*bytes_factor;
         }
-        printf("Reduced %d elems from tmp_array to bytes array of size %d\n", src_index, dst_index);
-        printf("Expected sizes were %d and %d\n", data_count*2, output_size);
+
+
         if (dst_index != output_size) {
             printf("WARNING WARNING: Written (%d) and expected (%d) sizes don't match", dst_index, output_size);
         }
     }
 
-    printf("\n\n");
+ //   printf("\n\n");
 
     free(tmp_array);
 

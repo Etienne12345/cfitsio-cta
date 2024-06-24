@@ -1271,6 +1271,7 @@ int fffi8r8(LONGLONG *input,      /* I - array of values to be converted     */
             for (ii = 0; ii < ntodo; ii++) {
  
                 ulltemp = (ULONGLONG) (((LONGLONG) input[ii]) ^ 0x8000000000000000);
+printf("Output: %lu", ulltemp);
                 output[ii] = (double) ulltemp;
             }
         }

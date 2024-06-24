@@ -6422,7 +6422,7 @@ int imcomp_decompress_tile (fitsfile *infptr,
     } else if ((infptr->Fptr)->compress_type == CTA) {
 
         // FIXME deal with the version for actual images sizes and types
-        *status = fits_ctadecomp(cbuf, (long) nelemll, (unsigned char*)idata, tilelen, 0, 0);
+        *status = fits_ctadecomp(cbuf, (long) nelemll, (unsigned char*)idata, tilelen, 0, 0, 0);
 
     } else {
         ffpmsg("unknown compression algorithm");
@@ -8170,6 +8170,7 @@ int fits_compress_table(fitsfile *infptr, fitsfile *outfptr, int *status)
     /* ================================================================================== */
     /*  Construct the header of the output compressed table  */
     /* ================================================================================== */
+    infptr-
     fits_copy_header(infptr, outfptr, status);  /* start with verbatim copy of the input header */
 
     fits_write_key(outfptr, TLOGICAL, "ZTABLE", &ltrue, "this is a compressed table", status);
@@ -8721,6 +8722,7 @@ int fits_uncompress_table(fitsfile *infptr, fitsfile *outfptr, int *status)
     char colcode[999];  /* column data type code character */
     char coltype[999];  /* column data type numeric code value */
     int colwidth[999];
+    double colzero[999];
     char *cm_buffer;   /* memory buffer for the transposed, Column-Major, chunk of the table */ 
     char *rm_buffer;   /* memory buffer for the original, Row-Major, chunk of the table */ 
     LONGLONG nrows, rmajor_colwidth[999], rmajor_colstart[1000], cmajor_colstart[1000];
@@ -8823,6 +8825,8 @@ int fits_uncompress_table(fitsfile *infptr, fitsfile *outfptr, int *status)
     strncpy(card, "PCOUNT ", 7);
     fits_update_card(outfptr, "PCOUNT", card, status);
 
+    fits_delete_key(outfptr, "ZHEAPPTR", status); /* No more Z stuff in the output*/
+    fits_delete_key(outfptr, "THEAP", status);    /* No more HEAP, at least when starting up the file*/
     fits_delete_key(outfptr, "ZTABLE", status);
     fits_delete_key(outfptr, "ZTILELEN", status);
     fits_delete_key(outfptr, "ZNAXIS1", status);
@@ -8842,6 +8846,9 @@ int fits_uncompress_table(fitsfile *infptr, fitsfile *outfptr, int *status)
     /* determine compression paramters for each column and write column-specific keywords */
     /* ================================================================================== */
     for (ii = 0; ii < ncols; ii++) {
+
+    colzero[ii] = (long long)((infptr->Fptr)->tableptr + ii )->tzero;
+//    printf("While trying to read col %d got %f\n", ii, colzero[ii]);
 
 	/* get the original column type, repeat count, and unit width */
 	fits_make_keyn("ZFORM", ii+1, keyname, status);
@@ -8995,8 +9002,8 @@ int fits_uncompress_table(fitsfile *infptr, fitsfile *outfptr, int *status)
 
             if (zctype[ii] == CTA) {
 
-                dlen = fits_ctadecomp((unsigned char*)ptr, vla_repeat, (unsigned char*)cptr, fullsize, coltype[ii], colwidth[ii]); 
-                // TODO SWAP the bytes to make them FITS compliant
+                dlen = fits_ctadecomp((unsigned char*)ptr, vla_repeat, (unsigned char*)cptr, fullsize, coltype[ii], colwidth[ii], colzero[ii]); 
+                free(ptr);
                 continue;
             }
 
@@ -9005,8 +9012,7 @@ int fits_uncompress_table(fitsfile *infptr, fitsfile *outfptr, int *status)
 	        case 'I':
 
 	          if (zctype[ii] == RICE_1) {
-   	             dlen = fits_rdecomp_short((unsigned char *)ptr, vla_repeat, (unsigned short *)cptr, 
-		       fullsize / 2, 32);
+   	             dlen = fits_rdecomp_short((unsigned char *)ptr, vla_repeat, (unsigned short *)cptr, fullsize / 2, 32);
 #if BYTESWAPPED
                      ffswap2((short *) cptr, fullsize / 2); 
 #endif
@@ -9018,8 +9024,7 @@ int fits_uncompress_table(fitsfile *infptr, fitsfile *outfptr, int *status)
 	        case 'J':
 
 	          if (zctype[ii] == RICE_1) {
-   	              dlen = fits_rdecomp ((unsigned char *) ptr, vla_repeat, (unsigned int *)cptr, 
-		        fullsize / 4, 32);
+   	              dlen = fits_rdecomp ((unsigned char *) ptr, vla_repeat, (unsigned int *)cptr, fullsize / 4, 32);
 #if BYTESWAPPED
                       ffswap4((int *) cptr,  fullsize / 4); 
 #endif
@@ -9031,8 +9036,7 @@ int fits_uncompress_table(fitsfile *infptr, fitsfile *outfptr, int *status)
 	        case 'B':
 
 	          if (zctype[ii] == RICE_1) {
-   	              dlen = fits_rdecomp_byte ((unsigned char *) ptr, vla_repeat, (unsigned char *)cptr, 
-		        fullsize, 32);
+   	              dlen = fits_rdecomp_byte ((unsigned char *) ptr, vla_repeat, (unsigned char *)cptr, fullsize, 32);
 	          } else { /* gunzip the data into the correct location */
 	             uncompress2mem_from_mem(ptr, vla_repeat, &cptr, &fullsize, realloc, &dlen, status);        
 	          }
@@ -9211,7 +9215,13 @@ int fits_uncompress_table(fitsfile *infptr, fitsfile *outfptr, int *status)
 	         for (jj = 0; jj < rowspertile; jj++) {  /* loop over number of rows in the output table */
 		     cptr = rm_buffer + (rmajor_colstart[ii] + jj * rmajor_colstart[ncols]);   /* addr to copy to */
 		     memcpy(cptr, ptr, (size_t) rmajor_colwidth[ii]);
-	 
+             //if (rmajor_colwidth[ii] == 3710) {
+             //   printf("Transposing %d bytes starting at %x towards %x\n", rmajor_colwidth[ii], ptr, cptr);
+             //   printf("Values:\n");
+             //   int jjj;
+             //   for (jjj=0;jjj<1855;jjj++) printf("%hu ", ((unsigned short*)(ptr))[jjj]);
+             //   printf("\n");
+           // }
 		     ptr += (rmajor_colwidth[ii]);
 		 }
 	    }
@@ -9366,9 +9376,17 @@ int fits_uncompress_table(fitsfile *infptr, fitsfile *outfptr, int *status)
 
         if (datastart == 0) fits_get_hduaddrll(outfptr, &headstart, &datastart, &dataend, status);        
 
+
+printf("File statistics before writing. headstart:%ld datastart:%ld dataend:%ld\n", headstart, datastart, dataend);
+//if (naxis1 == 4303) {
+//   printf("Row-major Values:\n");
+//    int jjj;
+//    for (jjj=0;jjj<2151;jjj++) printf("%hu ", ((unsigned short*)(rm_buffer))[jjj]);
+//    printf("\n");/
+//}
         ffmbyt(outfptr, datastart, 1, status);
         ffpbyt(outfptr, naxis1 * rowspertile, rm_buffer, status);
-
+printf("wwwwwwwwwwwwwwwwwWRITING %d bytes between %d and %d\n", naxis1*rowspertile, datastart, datastart+naxis1*rowspertile);
 	/* increment pointers for next tile */
 	rowstart += rowspertile;
         rowsremain -= rowspertile;
@@ -9379,9 +9397,17 @@ int fits_uncompress_table(fitsfile *infptr, fitsfile *outfptr, int *status)
 
     free(rm_buffer);
     free(cm_buffer);
-	
+   printf("Value of the next start: %d\n", (outfptr->Fptr)->headstart[((outfptr->Fptr)->curhdu) + 1]);
+    //This leaves us right after the header it seems. Move and pad with zeros
+    ffchdu(outfptr, status);
+
+printf("Value of the next start: %d\n", (outfptr->Fptr)->headstart[((outfptr->Fptr)->curhdu) + 1]);
+   
     /* reset internal table structure parameters */
     fits_set_hdustruc(outfptr, status);
+
+    //ffpdfl(outfptr, status);
+
     return(*status);
 }
 /*--------------------------------------------------------------------------*/
