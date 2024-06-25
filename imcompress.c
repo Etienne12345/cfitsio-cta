@@ -9374,9 +9374,6 @@ int fits_uncompress_table(fitsfile *infptr, fitsfile *outfptr, int *status)
     free(rm_buffer);
     free(cm_buffer);
 
-    //This leaves us right after the header it seems. Move and pad with zeros
-    ffchdu(outfptr, status);
-   
     /* reset internal table structure parameters */
     fits_set_hdustruc(outfptr, status);
 
