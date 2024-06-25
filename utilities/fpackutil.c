@@ -1864,9 +1864,7 @@ int fp_test_hdu (fitsfile *infptr, fitsfile *outfptr, fitsfile *outfptr2,
 	else if (comptype == GZIP_1)
 		strcpy(ctype, "GZIP1");
 	else if (comptype == GZIP_2)
-		strcpy(ctype, "GZIP2");
-    else if (comptype == CTA)
-        strcpy(ctype, "CTA");/*
+		strcpy(ctype, "GZIP2");/*
 	else if (comptype == BZIP2_1)
 		strcpy(ctype, "BZIP2");
 */

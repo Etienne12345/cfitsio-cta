@@ -6419,11 +6419,6 @@ int imcomp_decompress_tile (fitsfile *infptr,
 	}
 
     /* ************************************************************* */
-    } else if ((infptr->Fptr)->compress_type == CTA) {
-
-        // FIXME deal with the version for actual images sizes and types
-        *status = fits_ctadecomp(cbuf, (long) nelemll, (unsigned char*)idata, tilelen, 0, 0, 0);
-
     } else {
         ffpmsg("unknown compression algorithm");
         free(idata);
@@ -8128,11 +8123,9 @@ int fits_compress_table(fitsfile *infptr, fitsfile *outfptr, int *status)
 	            default_algor = GZIP_2;
  	    } else if (!fits_strcasecmp(tempstring, "RICE_1")) {
 	            default_algor = RICE_1;
- 	    } else if (!fits_strcasecmp(tempstring, "CTA")) {
-                default_algor = CTA;
         } else {
  	        ffpmsg("FZALGOR specifies unsupported table compression algorithm:");
-		    ffpmsg(tempstring);
+		ffpmsg(tempstring);
 	        *status = DATA_COMPRESSION_ERR;
 	        return(*status);
 	    }
@@ -8170,7 +8163,6 @@ int fits_compress_table(fitsfile *infptr, fitsfile *outfptr, int *status)
     /* ================================================================================== */
     /*  Construct the header of the output compressed table  */
     /* ================================================================================== */
-    infptr-
     fits_copy_header(infptr, outfptr, status);  /* start with verbatim copy of the input header */
 
     fits_write_key(outfptr, TLOGICAL, "ZTABLE", &ltrue, "this is a compressed table", status);
@@ -8280,7 +8272,7 @@ int fits_compress_table(fitsfile *infptr, fitsfile *outfptr, int *status)
 			compalgor[ii] = GZIP_2;  /* gzip_2 usually works better gzip_1 */
 		}
 	} else if ( abs(coltype[ii]) == TSHORT ) {
-	        if (compalgor[ii] != GZIP_1 && compalgor[ii] != GZIP_2 && compalgor[ii] != RICE_1 && compalgor[ii] != CTA) {
+	        if (compalgor[ii] != GZIP_1 && compalgor[ii] != GZIP_2 && compalgor[ii] != RICE_1) {
 			compalgor[ii] = GZIP_2;  /* gzip_2 usually works better rice_1 */
 		 }
 	} else if (  abs(coltype[ii]) == TLONG	) {
@@ -8848,7 +8840,6 @@ int fits_uncompress_table(fitsfile *infptr, fitsfile *outfptr, int *status)
     for (ii = 0; ii < ncols; ii++) {
 
     colzero[ii] = (long long)((infptr->Fptr)->tableptr + ii )->tzero;
-//    printf("While trying to read col %d got %f\n", ii, colzero[ii]);
 
 	/* get the original column type, repeat count, and unit width */
 	fits_make_keyn("ZFORM", ii+1, keyname, status);
@@ -8983,7 +8974,7 @@ int fits_uncompress_table(fitsfile *infptr, fitsfile *outfptr, int *status)
 	
 	        /* read compressed bytes from input table */
 	        fits_read_descript(infptr, ii + 1, ntile, &vla_repeat, &vla_address, status);
-            //printf("Reading tile #%d, col #%d, start: %d, size: %d\n", ntile, ii+1, vla_address, vla_repeat);
+
 	        /* allocate memory and read in the compressed bytes */
 	        ptr = malloc(vla_repeat);
 	        if (!ptr) {
@@ -9215,13 +9206,6 @@ int fits_uncompress_table(fitsfile *infptr, fitsfile *outfptr, int *status)
 	         for (jj = 0; jj < rowspertile; jj++) {  /* loop over number of rows in the output table */
 		     cptr = rm_buffer + (rmajor_colstart[ii] + jj * rmajor_colstart[ncols]);   /* addr to copy to */
 		     memcpy(cptr, ptr, (size_t) rmajor_colwidth[ii]);
-             //if (rmajor_colwidth[ii] == 3710) {
-             //   printf("Transposing %d bytes starting at %x towards %x\n", rmajor_colwidth[ii], ptr, cptr);
-             //   printf("Values:\n");
-             //   int jjj;
-             //   for (jjj=0;jjj<1855;jjj++) printf("%hu ", ((unsigned short*)(ptr))[jjj]);
-             //   printf("\n");
-           // }
 		     ptr += (rmajor_colwidth[ii]);
 		 }
 	    }
@@ -9376,17 +9360,9 @@ int fits_uncompress_table(fitsfile *infptr, fitsfile *outfptr, int *status)
 
         if (datastart == 0) fits_get_hduaddrll(outfptr, &headstart, &datastart, &dataend, status);        
 
-
-printf("File statistics before writing. headstart:%ld datastart:%ld dataend:%ld\n", headstart, datastart, dataend);
-//if (naxis1 == 4303) {
-//   printf("Row-major Values:\n");
-//    int jjj;
-//    for (jjj=0;jjj<2151;jjj++) printf("%hu ", ((unsigned short*)(rm_buffer))[jjj]);
-//    printf("\n");/
-//}
         ffmbyt(outfptr, datastart, 1, status);
         ffpbyt(outfptr, naxis1 * rowspertile, rm_buffer, status);
-printf("wwwwwwwwwwwwwwwwwWRITING %d bytes between %d and %d\n", naxis1*rowspertile, datastart, datastart+naxis1*rowspertile);
+
 	/* increment pointers for next tile */
 	rowstart += rowspertile;
         rowsremain -= rowspertile;
@@ -9397,16 +9373,12 @@ printf("wwwwwwwwwwwwwwwwwWRITING %d bytes between %d and %d\n", naxis1*rowsperti
 
     free(rm_buffer);
     free(cm_buffer);
-   printf("Value of the next start: %d\n", (outfptr->Fptr)->headstart[((outfptr->Fptr)->curhdu) + 1]);
+
     //This leaves us right after the header it seems. Move and pad with zeros
     ffchdu(outfptr, status);
-
-printf("Value of the next start: %d\n", (outfptr->Fptr)->headstart[((outfptr->Fptr)->curhdu) + 1]);
    
     /* reset internal table structure parameters */
     fits_set_hdustruc(outfptr, status);
-
-    //ffpdfl(outfptr, status);
 
     return(*status);
 }

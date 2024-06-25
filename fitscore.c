@@ -4251,19 +4251,9 @@ int ffghadll(fitsfile *fptr,     /* I - FITS file pointer                     */
     if (datastart)
         *datastart = (fptr->Fptr)->datastart;
 
-    if ((fptr->Fptr)->writemode) {
-        if (dataend) {
-            LONGLONG data_size = (fptr->Fptr)->numrows * (fptr->Fptr)->rowlength;
-            if (data_size % 2880) data_size = (data_size / 2880)*2880 + 2880;
-            *dataend = (fptr->Fptr)->datastart + data_size;
-            (fptr->Fptr)->headstart[((fptr->Fptr)->curhdu) + 1] = *dataend;
-//            printf("The new dataend is %d. The next HDU start is %d\n", *dataend, (fptr->Fptr)->headstart[((fptr->Fptr)->curhdu) + 1] );
-        }
-    }
-    else {
-        if (dataend)
-            *dataend = (fptr->Fptr)->headstart[((fptr->Fptr)->curhdu) + 1];       
-    }
+    if (dataend)
+        *dataend = (fptr->Fptr)->headstart[((fptr->Fptr)->curhdu) + 1];
+    
     return(*status);
 }
 /*--------------------------------------------------------------------------*/
@@ -5519,12 +5509,10 @@ int ffgtbp(fitsfile *fptr,     /* I - FITS file pointer   */
             /* ignore this error, so don't return error status */
             return(*status);
         }
-//        printf("DEALING WITH THEAP for table %x\n", fptr->Fptr);
-//        printf("HEAPSIZE: %d\n", (fptr->Fptr)->heapsize);
-//        printf("THEAP value: %d\n", (fptr->Fptr)->heapstart); 
-//        printf("keyword THEAP: %d\n", jjvalue);
+
         if ((fptr->Fptr)->ZHEAPPTR_found == 0)
             (fptr->Fptr)->heapstart = jjvalue; /* starting byte of the heap */
+
         return(*status);
     }
     else if (!FSTRNCMP(name, "ZHEAPPTR", 8))
@@ -5538,10 +5526,7 @@ int ffgtbp(fitsfile *fptr,     /* I - FITS file pointer   */
             /* ignore this error, so don't return error status */
             return(*status);
         }
-        printf("DEALING WITH ZHEAPPTR for table %x\n", fptr->Fptr);
-//        printf("HEAPSIZE: %d\n", (fptr->Fptr)->heapsize);
-//        printf("THEAP value: %d\n", (fptr->Fptr)->heapstart); //heapsize
-//        printf("ZHEAPPTR value: %d\n", jjvalue);
+
         (fptr->Fptr)->ZHEAPPTR_found = 1;
         if ((fptr->Fptr)->heapsize != 0)
             (fptr->Fptr)->heapsize -= jjvalue - (fptr->Fptr)->heapstart; /* Modify the size of the heap according to the compressed data*/
@@ -7294,7 +7279,6 @@ int ffcrhd(fitsfile *fptr,      /* I - FITS file pointer */
     if (ffchdu(fptr, status) <= 0)  /* close the current HDU */
     {
       bytepos = (fptr->Fptr)->headstart[(fptr->Fptr)->maxhdu + 1]; /* last */
-printf("CCCCCLLLOOOSSSIIINNNGGG CURRRENT HDU. bytepos = %d\n", bytepos);
       ffmbyt(fptr, bytepos, IGNORE_EOF, status);  /* move file ptr to it */
       (fptr->Fptr)->maxhdu++;       /* increment the known number of HDUs */
       (fptr->Fptr)->curhdu = (fptr->Fptr)->maxhdu; /* set current HDU loc */
