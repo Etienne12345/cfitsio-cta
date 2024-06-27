@@ -8839,9 +8839,9 @@ int fits_uncompress_table(fitsfile *infptr, fitsfile *outfptr, int *status)
     /* ================================================================================== */
     for (ii = 0; ii < ncols; ii++) {
 
-    colzero[ii] = (long long)((infptr->Fptr)->tableptr + ii )->tzero;
-
-	/* get the original column type, repeat count, and unit width */
+    colzero[ii] = ((infptr->Fptr)->tableptr + ii )->tzero;
+    
+    /* get the original column type, repeat count, and unit width */
 	fits_make_keyn("ZFORM", ii+1, keyname, status);
 	fits_read_key(infptr, TSTRING, keyname, tform, comm, status);
 

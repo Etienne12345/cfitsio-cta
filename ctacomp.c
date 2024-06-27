@@ -48,7 +48,7 @@ void erase_lut(struct LUT* lut)
 void apply_offset(char* array, 
                   int   num, 
                   int   elem_size, 
-                  unsigned long long offset)
+                  double offset)
 {
     if (offset == 0)
         return;
@@ -73,8 +73,10 @@ void apply_offset(char* array,
         break;
         case 8: ; 
             unsigned long long* long_array = (unsigned long long*)(array);
-            for (i=0;i<num;i++) 
-                long_array[i] -= offset;           
+            for (i=0;i<num;i++) {
+                unsigned long long ulong_value = offset;
+                long_array[i] -= ulong_value;
+            }           
         break;
         default:
             ffpmsg("ERROR: Non supported type size.");
@@ -91,7 +93,7 @@ void apply_offset(char* array,
 void pad_with_value(char* array, 
                     int   num, 
                     int   elem_size, 
-                    unsigned long long value)
+                    double value)
 {
     int i;
     switch (elem_size)
@@ -192,7 +194,7 @@ int fits_ctadecomp(unsigned char* c,
                    unsigned long  output_size, 
                    int            col_type,
                    int            col_width,
-                   unsigned long long col_zero)
+                   double         col_zero)
 {
     unsigned long output_num = output_size / 2;
     unsigned char* max_input_address = c + input_len;
@@ -261,14 +263,14 @@ int fits_ctadecomp(unsigned char* c,
     }
 
     /* if we have only one input symbol, fill up the output with it */
-    if (sym_count == 1) {
-
-        for (i=0;i<output_num;i++) {
-            ((unsigned short*)(array))[i] = lut->symbol;
-        }
-
-        return 0;
-    }
+   // if (sym_count == 1) {
+//
+//        for (i=0;i<output_num;i++) {
+//            ((unsigned short*)(array))[i] = lut->symbol;
+//        }
+//
+//        return 0;
+//    }
    
     /* take a temporary array to reshuffle the uncompressed data */
     unsigned short* tmp_array = malloc(data_count*sizeof(unsigned short));
@@ -354,7 +356,7 @@ int fits_ctadecomp(unsigned char* c,
             return(-1);
         break;
     };
-
+printf("Col width: %d\n", col_width);
     /* Copy the temp array data to the output array */
     if (col_width == 1) {
         apply_offset((char*)(tmp_array), output_size / bytes_factor, bytes_factor, col_zero);
